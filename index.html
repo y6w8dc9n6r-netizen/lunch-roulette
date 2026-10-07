@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lunch Roulette PRO</title>
+
+<style>
+:root {
+    --primary:#4f46e5;
+    --bg:#f4f6fb;
+    --card:#ffffff;
+    --text:#1f2937;
+}
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+body{
+    background:var(--bg);
+    color:var(--text);
+    text-align:center;
+    padding:20px;
+}
+
+h1{
+    margin-bottom:15px;
+}
+
+.pointer{
+    font-size:42px;
+    color:#ef4444;
+    margin-bottom:-10px;
+}
+
+canvas{
+    background:white;
+    border-radius:50%;
+    max-width:420px;
+    width:100%;
+    box-shadow:0 8px 20px rgba(0,0,0,.12);
+}
+
+.card{
+    max-width:700px;
+    margin:15px auto;
+    background:var(--card);
+    border-radius:16px;
+    padding:16px;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+}
+
+input,select{
+    width:100%;
+    padding:12px;
+    margin-top:8px;
+    border:1px solid #ddd;
+    border-radius:8px;
+}
+
+button{
+    border:none;
+    background:var(--primary);
+    color:white;
+    padding:12px 18px;
+    border-radius:10px;
+    font-weight:bold;
+    cursor:pointer;
+    margin:5px;
+}
+
+button:active{
+    transform:scale(.97);
+}
+
+.deleteBtn{
+    background:#ef4444;
+}
+
+#result{
+    margin:15px;
+    font-size:32px;
+    font-weight:bold;
+    color:#e11d48;
+}
+
+.menu-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:#f9fafb;
+    padding:10px;
+    border-radius:10px;
+    margin-top:8px;
+}
+
+.small{
+    font-size:13px;
+    color:#6b7280;
+}
+
+.win{
+    animation:pop .5s ease;
+}
+
+@keyframes pop{
+    0%{
+        transform:scale(.5);
+    }
+    100%{
+        transform:scale(1);
+    }
+}
+</style>
+</head>
+
+<body>
+
+<h1>🍽 Lunch Roulette PRO</h1>
+
+<div class="pointer">▼</div>
+
+<canvas id="wheel" width="500" height="500"></canvas>
+
+<div id="result">오늘 뭐 먹지?</div>
+
+<button onclick="spin()">🎰 룰렛 돌리기</button>
+
+<div class="card">
+
+<h3>메뉴 추가</h3>
+
+<input id="menuName" placeholder="메뉴명 입력">
+
+<select id="category">
+    <option>한식</option>
+    <option>중식</option>
+    <option>일식</option>
+    <option>양식</option>
+    <option>분식</option>
+    <option>패스트푸드</option>
+</select>
+
+<button onclick="addMenu()">메뉴 추가</button>
+
+</div>
+
+<div class="card">
+<h3>📋 메뉴 목록</h3>
+<div id="menuList"></div>
+</div>
+
+<div class="card">
+<h3>🚫 최근 7회 제외 기록</h3>
+<div id="history"></div>
+</div>
+
+<script>
+
+let menus =
+JSON.parse(localStorage.getItem("menus")) || [
+    {name:"김치찌개",cat:"한식"},
+    {name:"제육볶음",cat:"한식"},
+    {name:"짜장면",cat:"중식"},
+    {name:"짬뽕",cat:"중식"},
+    {name:"초밥",cat:"일식"},
+    {name:"돈까스",cat:"일식"},
+    {name:"파스타",cat:"양식"},
+    {name:"떡볶이",cat:"분식"},
+    {name:"햄버거",cat:"패스트푸드"}
+];
+
+let recent =
+JSON.parse(localStorage.getItem("recent")) || [];
+
+let angle = 0;
+let spinning = false;
+
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+
+const colors = [
+ "#60a5fa",
+ "#34d399",
+ "#fbbf24",
+ "#fb7185",
+ "#a78bfa",
+ "#22d3ee",
+ "#f97316",
+ "#84cc16",
+ "#e879f9"
+];
+
+function saveData(){
+    localStorage.setItem(
+        "menus",
+        JSON.stringify(menus)
+    );
+
+    localStorage.setItem(
+        "recent",
+        JSON.stringify(recent)
+    );
+}
+
+function drawWheel(){
+
+    ctx.clearRect(0,0,500,500);
+
+    if(menus.length===0) return;
+
+    const arc =
+    (Math.PI*2)/menus.length;
+
+    menus.forEach((menu,index)=>{
+
+        let start =
+        angle + index*arc;
+
+        ctx.beginPath();
+        ctx.moveTo(250,250);
+
+        ctx.arc(
+            250,
+            250,
+            220,
+            start,
+            start+arc
+        );
+
+        ctx.fillStyle =
+        colors[index%colors.length];
+
+        ctx.fill();
+
+        ctx.save();
+
+        ctx.translate(250,250);
+        ctx.rotate(start+arc/2);
+
+        ctx.fillStyle="white";
+        ctx.font="bold 16px sans-serif";
+
+        ctx.fillText(
+            menu.name,
+            120,
+            5
+        );
+
+        ctx.restore();
+    });
+
+}
+
+function spin(){
+
+    if(spinning) return;
+
+    let available =
+    menus.filter(
+        menu =>
+        !recent.includes(menu.name)
+    );
+
+    if(available.length===0){
+
+        alert(
+            "최근 7회 규칙 때문에 선택 가능한 메뉴가 없습니다."
+        );
+
+        return;
+    }
+
+    spinning=true;
+
+    const winner =
+    available[
+        Math.floor(
+            Math.random()*available.length
+        )
+    ];
+
+    const index =
+    menus.findIndex(
+        m=>m.name===winner.name
+    );
+
+    const arc =
+    (Math.PI*2)/menus.length;
+
+    const target =
+    (Math.PI*2*8)
+    +(1.5*Math.PI)
+    -(index*arc);
+
+    const startAngle = angle;
+
+    const start =
+    performance.now();
+
+    function animate(now){
+
+        const progress =
+        Math.min(
+            (now-start)/5000,
+            1
+        );
+
+        const ease =
+        1-Math.pow(
+            1-progress,
+            3
+        );
+
+        angle =
+        startAngle +
+        (target-startAngle)*ease;
+
+        drawWheel();
+
+        if(progress<1){
+
+            requestAnimationFrame(
+                animate
+            );
+
+        }else{
+
+            spinning=false;
+
+            document
+            .getElementById("result")
+            .className="win";
+
+            document
+            .getElementById("result")
+            .innerHTML=
+            "🎉 "+winner.name;
+
+            recent.unshift(
+                winner.name
+            );
+
+            if(recent.length>7){
+                recent =
+                recent.slice(0,7);
+            }
+
+            saveData();
+            renderHistory();
+        }
+    }
+
+    requestAnimationFrame(
+        animate
+    );
+}
+
+function addMenu(){
+
+    const name =
+    document
+    .getElementById("menuName")
+    .value
+    .trim();
+
+    if(!name) return;
+
+    menus.push({
+        name:name,
+        cat:
+        document
+        .getElementById("category")
+        .value
+    });
+
+    saveData();
+
+    renderMenus();
+    drawWheel();
+
+    document
+    .getElementById("menuName")
+    .value="";
+}
+
+function removeMenu(index){
+
+    menus.splice(index,1);
+
+    saveData();
+
+    renderMenus();
+    drawWheel();
+}
+
+function renderMenus(){
+
+    document
+    .getElementById("menuList")
+    .innerHTML =
+
+    menus.map((m,index)=>`
+
+    <div class="menu-row">
+
+        <div>
+            <strong>${m.name}</strong><br>
+            <span class="small">
+            ${m.cat}
+            </span>
+        </div>
+
+        <button
+        class="deleteBtn"
+        onclick="removeMenu(${index})">
+        삭제
+        </button>
+
+    </div>
+
+    `).join("");
+}
+
+function renderHistory(){
+
+    document
+    .getElementById("history")
+    .innerHTML =
+
+    recent.length
+    ? recent.join(" → ")
+    : "기록 없음";
+
+}
+
+renderMenus();
+renderHistory();
+drawWheel();
+
+</script>
+
+</body>
+</html>
